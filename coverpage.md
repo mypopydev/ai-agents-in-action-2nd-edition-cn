@@ -1,10 +1,10 @@
 # AI Agents in Action
 
-# <mark>AI 智能体实战</mark>
+# <mark>AI Agent 实战</mark>
 
 > 《AI Agents in Action》第二版 · 中英文对照翻译
 
-- 大语言模型与智能体基础
+- 大语言模型与 Agent 基础
 - MCP 协议与多智能体系统
 - RAG、推理、评估与部署
 
