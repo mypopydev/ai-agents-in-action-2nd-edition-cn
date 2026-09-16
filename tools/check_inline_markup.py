@@ -44,10 +44,17 @@ process.stdin.on("end", () => {
       if (t.type === "strong") strong++;
       if (t.type === "em") em++;
       if (t.type === "codespan") codespan++;
-      if (t.type === "text" && typeof t.raw === "string" && /[*`]/.test(t.raw)) {
+      // 只把**叶子** text 判为失效。列表项外面包了一层 text，它的 raw 是整条原文
+      // （含已成功解析的 **…**），照 raw 判断会把合法加粗全误报成失效；
+      // 有 .tokens 说明这一层已被成功解析，不该算失效。
+      if (t.type === "text" && !t.tokens && typeof t.raw === "string" && /[*`]/.test(t.raw)) {
         broken.push(t.raw);
       }
+      // marked 的 list token 用 .items 而不是 .tokens —— 只跟 .tokens 会
+      // **完全跳过所有列表项**。本书大量加粗都在列表里（- **#1** …、- **专业化**：…），
+      // 漏掉它们意味着这些位置的失效标记永远查不出来。
       if (t.tokens) for (const k of t.tokens) walk(k);
+      if (t.items) for (const k of t.items) walk(k);
     };
     for (const t of marked.lexer(src)) walk(t);
     return { broken, strong, em, codespan };
