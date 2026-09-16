@@ -136,14 +136,15 @@ def demote_extra_h1(text: str, source: str) -> str:
 
 
 def strip_title(text: str) -> tuple[str, str]:
-    """取出正文并剥离 H1 里自带的章号前缀，返回 (改过的正文, 纯标题)。"""
+    """返回 (正文原样, 剥掉章号前缀的纯标题)。
+
+    只解析标题，不改正文；改 H1 由调用方用 set_h1() 完成。
+    """
     m = H1.search(text)
     if not m:
         return text, ""
     raw = m.group(1).strip()
-    title = TITLE_PREFIX.sub("", raw).strip() or raw
-    # 记录原标题，供调用方决定如何重写
-    return text, title
+    return text, (TITLE_PREFIX.sub("", raw).strip() or raw)
 
 
 def set_h1(text: str, new_title: str) -> str:
@@ -163,34 +164,43 @@ def normalize_glyphs(text: str) -> tuple[str, dict[str, int]]:
     return text, counts
 
 
-def build_merged() -> tuple[str, dict[str, int]]:
+def build_merged() -> tuple[str, dict[str, int], list[tuple[str, float]]]:
     """按书序合并各章。
 
     章号由脚本按 `CHAPTERS` 的顺序重新写入标题，而不交给 LaTeX 计数器
     （ctex 的 \\chapter 在自增计数器之前就调用 \\chaptermark，用 \\CTEXthechapter
     取到的永远是「第零章」，见 header.tex 注释）。这样也保证章节号与文件顺序永远一致。
+
+    返回值第三项是每个文件的「输出/输入」字符比，用于兜住"正文被吞"这类事故
+    （改写标题时若不小心复用变量，可能把整段正文替换成标题字符串，而构建仍成功）。
     """
     parts: list[str] = []
+    ratios: list[tuple[str, float]] = []
+
+    def take(name: str, new_title: str) -> str:
+        src = load(name)
+        text = demote_extra_h1(src, name)
+        _, title = strip_title(text)
+        out = set_h1(text, new_title(title))
+        ratios.append((name, len(out) / max(len(src), 1)))
+        return out
 
     for name in FRONT:
-        parts.append(set_h1(load(name), "关于本书 {-}"))
+        parts.append(take(name, lambda _t: "关于本书 {-}"))
 
     for i, name in enumerate(CHAPTERS, 1):
         if not (SRC / name).exists():
             sys.exit(f"缺少章节文件：{name}")
-        body = demote_extra_h1(load(name), name)
-        body, title = strip_title(body)
-        parts.append(set_h1(body, f"第 {i} 章 {title}"))
+        parts.append(take(name, lambda t, i=i: f"第 {i} 章 {t}"))
 
     for letter, name in zip("AB", APPENDIX):
-        body = demote_extra_h1(load(name), name)
-        body, title = strip_title(body)
-        body = APPENDIX_PREFIX.sub("", title).strip() or title
-        parts.append(set_h1(body, f"附录 {letter} {body} {{-}}"))
+        parts.append(
+            take(name, lambda t, l=letter: f"附录 {l} {APPENDIX_PREFIX.sub('', t).strip() or t} {{-}}")
+        )
 
     merged = "\n\n\\newpage\n\n".join(p.strip() for p in parts)
     merged, counts = normalize_glyphs(merged)
-    return merged, counts
+    return merged, counts, ratios
 
 
 def run_pandoc(src: pathlib.Path, out: pathlib.Path, head: pathlib.Path, date: str) -> None:
@@ -239,7 +249,15 @@ def main() -> None:
     dist.mkdir(exist_ok=True)
     out = args.output or dist / "ai-agents-in-action-2nd-cn.pdf"
 
-    merged, counts = build_merged()
+    merged, counts, ratios = build_merged()
+
+    # 兜底：改写标题时若误吞正文，构建仍会「成功」，只有页数会悄悄变少。
+    thin = [(n, r) for n, r in ratios if r < 0.95]
+    if thin:
+        print("  ⚠ 以下文件合并后内容明显变短，疑似正文被吞：")
+        for n, r in thin:
+            print(f"     {n}  输出/输入 = {r:.2%}")
+
     work = dist / "build"
     work.mkdir(exist_ok=True)
     src = work / "book.md"
