@@ -77,7 +77,11 @@ BASELINE: dict[str, object] = {
     "书稿代码块含中文": 0,
     "README 目录与 H1 不一致": 0,
     # PDF
-    "PDF 页数": 384,
+    # 页数是总闸：构建脚本「成功」但吞掉正文时，只有它会变。改 384→380 的原因
+    # 是给 30 个代码块补了语言标记——补了会走 pandoc 的 Shaded/Highlighting，
+    # 从而继承 header.tex 里 \fvset 的 fontsize=\small；没补则是标准 verbatim，
+    # 按正文字号排版。30 块整体降一号字，净少 4 页，属预期。
+    "PDF 页数": 380,
     "PDF 纸型": "A4",
     "PDF 书签总数": 92,
     "PDF 书签 L0": 14,
