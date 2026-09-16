@@ -91,6 +91,8 @@ BASELINE: dict[str, object] = {
     "PDF 目录三级泄漏": 0,
     "PDF 附录标题缺失": 0,
     "PDF 出现源文没有的字符": 0,
+    # 长行顶出纸面被裁掉的行数。老指标抓不到它：字形在、字符集不变、页数正常。
+    "PDF 越界裁切行": 0,
 }
 
 ZERO_EXPECTED = {k for k, v in BASELINE.items() if v == 0 and "轻微" not in k}
@@ -292,6 +294,38 @@ def count_pdf_chars() -> dict[str, int]:
 GLYPH_FIXES = "\u27f9\U0001f7e2\U0001f680\ufe0f"
 
 
+def count_pdf_overflow() -> dict[str, int]:
+    """物理越出纸面、被裁掉的行数。
+
+    pandoc 对**没标语言**的代码块输出标准 \\begin{verbatim}，它不折行，超长行会顶出
+    纸面被切掉——页面上会看到 "to confirm reac"（reaction）、"what remains unkn"
+    这类半截词。这类缺陷三个老指标全都漏掉：字形都在（缺字形=0）、没多出字符
+    （字符差集=0）、页数也正常，只有量每行的 xMax 才看得见。
+    只统计 xMax 超过**纸宽**的；越出版心但仍落在纸面内的绝大多数是中文标点悬挂
+    （实测 435/502 行末字符是「，。、）」、越界幅度正好一个全角标点宽），属正常排版。
+    """
+    if not PDF.exists():
+        return {}
+    with tempfile.NamedTemporaryFile(suffix=".html", delete=False) as f:
+        tmp = f.name
+    try:
+        subprocess.run(["pdftotext", "-bbox-layout", str(PDF), tmp],
+                       check=True, capture_output=True)
+        s = pathlib.Path(tmp).read_text(encoding="utf-8", errors="replace")
+    finally:
+        pathlib.Path(tmp).unlink(missing_ok=True)
+    m = re.search(r'<page width="([\d.]+)"', s)
+    if not m:
+        return {}
+    edge = float(m.group(1))
+    n = sum(
+        1
+        for ln in re.findall(r"<line[^>]*>(.*?)</line>", s, re.S)
+        if (xs := re.findall(r'xMax="([\d.]+)"', ln)) and max(map(float, xs)) > edge
+    )
+    return {"PDF 越界裁切行": n}
+
+
 def run_checker(script: str) -> str:
     p = subprocess.run([sys.executable, str(REPO / "tools" / script)],
                        capture_output=True, text=True)
@@ -399,6 +433,7 @@ def main() -> None:
     cur.update(count_checkers())
     cur.update(count_pdf())
     cur.update(count_pdf_chars())
+    cur.update(count_pdf_overflow())
 
     if args.update:
         changed = {k: v for k, v in cur.items() if BASELINE.get(k) != v}
