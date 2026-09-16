@@ -112,7 +112,10 @@ HEADER_TEX = r"""
 % Menlo 映射正确，只有中文正文受影响。这里把省略号换到一个映射正确的 CJK 字体。
 % 注意必须用 newCJKfontfamily（保持该字符仍在 CJK 标点类里）——
 % 直接用 newfontfamily + newunicodechar 会被 xeCJK 的标点处理绕过去，不生效。
-\newCJKfontfamily\ellipsisfont{PingFang SC}
+% 选 STFangsong 而不是 PingFang SC：后者 fc-match 解析虽正确（苹方-简），
+% 但 fontspec 从 .ttc 取 face 时实际拿到的是 **PingFangHK**（港区字形）。
+% STFangsong 是 macold 的等宽 CJK 字体，本书本来就在用，不额外引入字体。
+\newCJKfontfamily\ellipsisfont{STFangsong}
 \newunicodechar{…}{{\ellipsisfont …}}
 % 代码块超过版心的长行自动折行。
 % breaksymbolleft/right 必须清空：fvextra 默认在折行处插一个 ↪，它会**打印在页面上
@@ -231,6 +234,12 @@ def run_pandoc(src: pathlib.Path, out: pathlib.Path, head: pathlib.Path, date: s
         "--toc", "--toc-depth=2",
         "-H", str(head),
         "-V", "documentclass=ctexbook",
+        # 钉住 fontset。不钉的话 ctex 每次按机器自动判定：它看
+        # /System/Library/Fonts/PingFang.ttc 在不在，不在就退回 macold。
+        # 本机该路径不存在（PingFang 装了，只是不在 ctex 硬编码的位置）→ 现在取 macold；
+        # 换台机器或系统更新后可能翻到 macnew，等宽/斜体/无衬线的 CJK 字体会跟着变，
+        # 13 处含中文的行内代码会重新排版。钉住即可跨机器复现。
+        "-V", "classoption=fontset=macold",
         "-V", "CJKmainfont=Songti SC",
         "-V", "papersize=a4",
         "-V", "geometry:margin=2.3cm",
