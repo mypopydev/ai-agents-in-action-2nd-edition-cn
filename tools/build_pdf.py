@@ -1,0 +1,270 @@
+#!/usr/bin/env python3
+"""把 cn-book/ 下的 Markdown 构建成一本中文 PDF。
+
+用法：
+    python3 tools/build_pdf.py                 # 输出到 dist/
+    python3 tools/build_pdf.py -o /tmp/x.pdf   # 指定输出
+    python3 tools/build_pdf.py --keep          # 保留中间产物 dist/build/
+
+依赖（本机已具备）：pandoc、XeLaTeX（TeX Live + ctex）。
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+
+REPO = pathlib.Path(__file__).resolve().parent.parent
+SRC = REPO / "cn-book"
+
+BOOK_TITLE = "AI Agents in Action（第二版）"
+BOOK_SUBTITLE = "中文译本 · Intelligent workflows with LLMs, MCP, A2A, and more"
+BOOK_AUTHOR = "Michael Lanham 著"
+
+# 章序（与 sidebar.md 一致）
+FRONT = ["0.关于本书.md"]
+CHAPTERS = [
+    "1.AI智能体的崛起.md",
+    "2.核心组件.md",
+    "3.AI智能体的MCP操作.md",
+    "4.架构与构建多智能体系统.md",
+    "5.智能体推理与规划.md",
+    "6.为智能体处理记忆与知识RAG.md",
+    "7.通过评估与反馈构建稳健的智能体.md",
+    "8.部署智能体与智能体系统.md",
+    "9.理解智能体循环.md",
+    "10.探索会思考、监控和适应的认知智能体.md",
+    "11.构建智能体系统的实用技巧.md",
+]
+APPENDIX = [
+    "附录A-设置示例代码仓库.md",
+    "附录B-为本地MCP服务器设置Node.js.md",
+]
+
+H1 = re.compile(r"^#\s+(.*)$", re.M)
+FENCE = re.compile(r"^\s*```")
+# 「第 10 章 标题」「10 标题」「第 3 章：标题」等前缀
+TITLE_PREFIX = re.compile(r"^第?\s*\d+\s*章?[：:、.\s]+")
+# 附录标题里自带的「附录 A 」，交给 LaTeX 自己渲染
+APPENDIX_PREFIX = re.compile(r"^附录\s*[A-Z]\s*[：:、.\s]*")
+
+# 这些字符没有任何已装字体能渲染，构建时替换为等价且可渲染的字符。
+# 只作用于合并后的临时文件，**不写回仓库**；网站显示保持原样。
+GLYPH_MAP = {
+    "\u27f9": "\u21d2",        # ⟹ → ⇒     Menlo 无 U+27F9
+    "\U0001f7e2": "\u25cf",    # 🟢 → ●     emoji，XeTeX 无法渲染
+    "\U0001f680": "\u25b6",    # 🚀 → ▶     同上
+    "\ufe0f": "",              # 变体选择符 U+FE0F，去掉即可（⚠️ → ⚠）
+}
+
+HEADER_TEX = r"""
+% ============ 封面 ============
+\usepackage{graphicx}
+% 图片不超过版心宽度（pandoc 默认按原始尺寸插入，截图会溢出）
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\makeatother
+\setkeys{Gin}{width=\maxwidth,keepaspectratio}
+
+% ============ 页眉页脚 ============
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE,RO]{\thepage}
+\fancyhead[LO]{\nouppercase{\rightmark}}
+\fancyhead[RE]{\nouppercase{\leftmark}}
+\renewcommand{\headrulewidth}{0.4pt}
+% 章节号由脚本写进标题（源文件里两种写法混用），LaTeX 不再自动编号，
+% 页眉直接取标题。不能用 \CTEXthechapter —— ctex 的 \chapter 在自增计数器
+% 之前就调用 \chaptermark，取到的永远是「第零章」。
+\renewcommand{\chaptermark}[1]{\markboth{#1}{}}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[LE,RO]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+% 保留「第 3 章 使用 MCP…」里章号后的空格（xeCJK 默认会吃掉中文之间的空格）
+\xeCJKsetup{CJKspace=true}
+
+% ============ 字体 ============
+% 等宽（代码块）：Menlo 覆盖 ≤ ≈ ≥ ⚠ ➥ → ⇒ ● ▶
+\setmonofont{Menlo}[Scale=0.92]
+% 正文拉丁字体（Latin Modern）缺 数学运算符 / 杂项符号 / 补充箭头 区，
+% 回退到 Apple Symbols。注意 fontspec 的区间回退只生效一个字体，必须是最后一个。
+\setmainfont{Apple Symbols}[Range={mathematical-operators,miscellaneous-symbols,supplemental-arrows-a},Scale=MatchLowercase]
+% ➥ 在 Dingbats 区而 Apple Symbols 没有 —— 正文里定点修补（verbatim 内不生效，
+% 但代码块用的是 Menlo，本就有该字形）
+\usepackage{newunicodechar}
+\newfontfamily\dingfont{Zapf Dingbats}
+\newunicodechar{➥}{{\dingfont ➥}}
+% 代码块超过版心的长行自动折行
+\usepackage{fvextra}
+\fvset{breaklines=true,breakanywhere=true,fontsize=\small}
+"""
+
+
+def load(name: str) -> str:
+    return (SRC / name).read_text(encoding="utf-8")
+
+
+extra_h1: list[str] = []
+
+
+def demote_extra_h1(text: str, source: str) -> str:
+    """章文件里除第一个之外的一级标题降为二级。
+
+    每章只应有一个 H1（章标题）。正文里若混进 H1（如第 6 章的 `# 总结`），
+    pandoc 会把它当成新的一章，PDF 里会凭空多出一章。这里降级并记录，供最后提示。
+    """
+    out: list[str] = []
+    in_fence = False
+    seen = 0
+    for line in text.splitlines():
+        if FENCE.match(line):
+            in_fence = not in_fence
+            out.append(line)
+            continue
+        if not in_fence and line.startswith("# "):
+            seen += 1
+            if seen > 1:
+                extra_h1.append(f"{source}  {line.strip()}")
+                out.append("#" + line)
+                continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def strip_title(text: str) -> tuple[str, str]:
+    """取出正文并剥离 H1 里自带的章号前缀，返回 (改过的正文, 纯标题)。"""
+    m = H1.search(text)
+    if not m:
+        return text, ""
+    raw = m.group(1).strip()
+    title = TITLE_PREFIX.sub("", raw).strip() or raw
+    # 记录原标题，供调用方决定如何重写
+    return text, title
+
+
+def set_h1(text: str, new_title: str) -> str:
+    m = H1.search(text)
+    if not m:
+        return f"# {new_title}\n\n{text}"
+    return text[: m.start(1)] + new_title + text[m.end(1) :]
+
+
+def normalize_glyphs(text: str) -> tuple[str, dict[str, int]]:
+    counts: dict[str, int] = {}
+    for bad, good in GLYPH_MAP.items():
+        n = text.count(bad)
+        if n:
+            counts[f"{bad!r} → {good!r}" if good else f"{bad!r} → (删除)"] = n
+            text = text.replace(bad, good)
+    return text, counts
+
+
+def build_merged() -> tuple[str, dict[str, int]]:
+    """按书序合并各章。
+
+    源文件里一级标题有两种写法混用（`# 1 AI Agent 的崛起` 与
+    `# 第 2 章 核心组件：…`），这里统一重写为 `第 N 章 标题`，
+    既修掉不一致，也把章号交给标题文本而非 LaTeX 计数器（见 header.tex 注释）。
+    """
+    parts: list[str] = []
+
+    for name in FRONT:
+        parts.append(set_h1(load(name), "关于本书 {-}"))
+
+    for i, name in enumerate(CHAPTERS, 1):
+        if not (SRC / name).exists():
+            sys.exit(f"缺少章节文件：{name}")
+        body = demote_extra_h1(load(name), name)
+        body, title = strip_title(body)
+        parts.append(set_h1(body, f"第 {i} 章 {title}"))
+
+    for letter, name in zip("AB", APPENDIX):
+        body = demote_extra_h1(load(name), name)
+        body, title = strip_title(body)
+        body = APPENDIX_PREFIX.sub("", title).strip() or title
+        parts.append(set_h1(body, f"附录 {letter} {body} {{-}}"))
+
+    merged = "\n\n\\newpage\n\n".join(p.strip() for p in parts)
+    merged, counts = normalize_glyphs(merged)
+    return merged, counts
+
+
+def run_pandoc(src: pathlib.Path, out: pathlib.Path, head: pathlib.Path, date: str) -> None:
+    cmd = [
+        "pandoc", str(src),
+        "-o", str(out),
+        "--pdf-engine=xelatex",
+        f"--resource-path={REPO}",
+        "--toc", "--toc-depth=2",
+        "-H", str(head),
+        "-V", "documentclass=ctexbook",
+        "-V", "CJKmainfont=Songti SC",
+        "-V", "papersize=a4",
+        "-V", "geometry:margin=2.3cm",
+        "-V", "fontsize=11pt",
+        "-V", "linestretch=1.15",
+        "-V", f"title={BOOK_TITLE}",
+        "-V", f"subtitle={BOOK_SUBTITLE}",
+        "-V", f"author={BOOK_AUTHOR}",
+        "-V", f"date={date}",
+        "-V", "titlepage=true",
+        "-V", "colorlinks=true",
+        "-V", "linkcolor=black",
+        "-V", "toccolor=black",
+        "--highlight-style=tango",
+    ]
+    print("  " + " ".join(cmd[:6]) + " …")
+    proc = subprocess.run(cmd, capture_output=True, text=True)
+    warns = [l for l in proc.stderr.splitlines() if "Missing character" in l]
+    if warns:
+        print(f"  ⚠ 缺字形 {len(warns)} 条：")
+        for w in sorted(set(warns))[:10]:
+            print("     " + w.replace("[WARNING] ", ""))
+    if proc.returncode != 0:
+        print(proc.stderr[-3000:], file=sys.stderr)
+        sys.exit("pandoc 构建失败")
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="构建中文版 PDF")
+    ap.add_argument("-o", "--output", type=pathlib.Path)
+    ap.add_argument("--keep", action="store_true", help="保留中间产物")
+    args = ap.parse_args()
+
+    dist = REPO / "dist"
+    dist.mkdir(exist_ok=True)
+    out = args.output or dist / "ai-agents-in-action-2nd-cn.pdf"
+
+    merged, counts = build_merged()
+    work = dist / "build"
+    work.mkdir(exist_ok=True)
+    src = work / "book.md"
+    src.write_text(merged, encoding="utf-8")
+    head = work / "header.tex"
+    head.write_text(HEADER_TEX, encoding="utf-8")
+
+    if extra_h1:
+        print("  ⚠ 章文件里出现了额外的一级标题（已在本 PDF 中降为二级，建议改源文件）：")
+        for w in extra_h1:
+            print(f"     {w}")
+
+    if counts:
+        print("  字符归一化（仅 PDF 构建，不改仓库）：")
+        for k, v in counts.items():
+            print(f"     {k}  ×{v}")
+
+    date = dt.date.today().isoformat()
+    run_pandoc(src, out, head, date)
+
+    if not args.keep:
+        shutil.rmtree(work, ignore_errors=True)
+    size = out.stat().st_size / 1e6
+    print(f"\n✅ {out}  ({size:.1f} MB)")
+
+
+if __name__ == "__main__":
+    main()
