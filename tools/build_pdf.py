@@ -99,6 +99,14 @@ HEADER_TEX = r"""
 \usepackage{newunicodechar}
 \newfontfamily\dingfont{Zapf Dingbats}
 \newunicodechar{➥}{{\dingfont ➥}}
+
+% ============ 强调字体：中文用楷体 ============
+% 中文加粗改用楷体（Kaiti SC 有真实 Bold 字重，无需合成加粗）。
+% xeCJK 会自动分流字符：CJK 走 CJK 字体、拉丁走拉丁字体，
+% 所以 \kaiemph 只影响中文，150 处纯英文加粗（**Agent**/**MCP**）保持原样。
+% 必须显式声明 BoldFont —— 否则 \bfseries 在楷体家族下不生效，中文会静默掉字重。
+\newCJKfontfamily\kaiemph{Kaiti SC}[BoldFont={Kaiti SC Bold}]
+\renewcommand{\textbf}[1]{{\kaiemph\bfseries #1}}
 % 省略号：宋体一族（Songti SC / Songti TC / STSong / Kaiti SC）的 ToUnicode 会把
 % U+2026（…）反查成 U+22EF（⋯）——**复制出来与源文不是同一个码位**。代码块用的
 % Menlo 映射正确，只有中文正文受影响。这里把省略号换到一个映射正确的 CJK 字体。
