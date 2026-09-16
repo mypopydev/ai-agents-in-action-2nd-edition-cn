@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 import pathlib
 import re
 import shutil
@@ -203,7 +204,7 @@ def build_merged() -> tuple[str, dict[str, int], list[tuple[str, float]]]:
     return merged, counts, ratios
 
 
-def run_pandoc(src: pathlib.Path, out: pathlib.Path, head: pathlib.Path, date: str) -> None:
+def run_pandoc(src: pathlib.Path, out: pathlib.Path, head: pathlib.Path, date: str) -> int:
     cmd = [
         "pandoc", str(src),
         "-o", str(out),
@@ -237,6 +238,7 @@ def run_pandoc(src: pathlib.Path, out: pathlib.Path, head: pathlib.Path, date: s
     if proc.returncode != 0:
         print(proc.stderr[-3000:], file=sys.stderr)
         sys.exit("pandoc 构建失败")
+    return len(warns)
 
 
 def main() -> None:
@@ -276,7 +278,20 @@ def main() -> None:
             print(f"     {k}  ×{v}")
 
     date = dt.date.today().isoformat()
-    run_pandoc(src, out, head, date)
+    glyph_warns = run_pandoc(src, out, head, date)
+
+    # 机器可读的构建报告，供 tools/check_baseline.py 比对（缺字形等只在构建期可知）
+    report = {
+        "built": date,
+        "size_bytes": out.stat().st_size,
+        "glyph_warnings": glyph_warns,
+        "extra_h1": extra_h1,
+        "normalized": counts,
+        "min_content_ratio": min((r for _, r in ratios), default=1.0),
+    }
+    (dist / "build-report.json").write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     if not args.keep:
         shutil.rmtree(work, ignore_errors=True)
