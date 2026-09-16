@@ -166,9 +166,9 @@ def normalize_glyphs(text: str) -> tuple[str, dict[str, int]]:
 def build_merged() -> tuple[str, dict[str, int]]:
     """按书序合并各章。
 
-    源文件里一级标题有两种写法混用（`# 1 AI Agent 的崛起` 与
-    `# 第 2 章 核心组件：…`），这里统一重写为 `第 N 章 标题`，
-    既修掉不一致，也把章号交给标题文本而非 LaTeX 计数器（见 header.tex 注释）。
+    章号由脚本按 `CHAPTERS` 的顺序重新写入标题，而不交给 LaTeX 计数器
+    （ctex 的 \\chapter 在自增计数器之前就调用 \\chaptermark，用 \\CTEXthechapter
+    取到的永远是「第零章」，见 header.tex 注释）。这样也保证章节号与文件顺序永远一致。
     """
     parts: list[str] = []
 
