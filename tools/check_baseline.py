@@ -20,6 +20,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import tempfile
 import unicodedata
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -85,6 +86,7 @@ BASELINE: dict[str, object] = {
     "PDF 目录二级缺失": 0,
     "PDF 目录三级泄漏": 0,
     "PDF 附录标题缺失": 0,
+    "PDF 出现源文没有的字符": 0,
 }
 
 ZERO_EXPECTED = {k for k, v in BASELINE.items() if v == 0 and "轻微" not in k}
@@ -251,6 +253,41 @@ def count_readme_drift() -> dict[str, int]:
     return {"README 目录与 H1 不一致": bad}
 
 
+def pdf_text(path: pathlib.Path) -> str:
+    """抽取 PDF 文本。
+
+    必须写临时文件，**不能用 `pdftotext <pdf> -`**：stdin 不是终端时（heredoc、
+    DEVNULL）poppler 会去读 stdin，输出结果间歇性为空，导致校验静默通过。
+    """
+    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+        tmp = f.name
+    try:
+        subprocess.run(["pdftotext", str(path), tmp], check=True, capture_output=True)
+        return pathlib.Path(tmp).read_text(encoding="utf-8", errors="replace")
+    finally:
+        pathlib.Path(tmp).unlink(missing_ok=True)
+
+
+def count_pdf_chars() -> dict[str, int]:
+    """PDF 里出现、但源文件里从未出现过的字符数（排除构建时已知的归一化）。
+
+    这是「拷贝乱码」的兜底指标：字形显示正常但 ToUnicode 反查错码位时，
+    页面上看不出来，只有把它抽成文本才发现多出了源文没有的字符。
+    实例：`……`→`⋯`（宋体 ToUnicode 反查错）、`↪`（折页标记被复制进代码）。
+    """
+    if not PDF.exists():
+        return {}
+    src = "".join(f.read_text(encoding="utf-8") for f in SRC.glob("*.md"))
+    # 构建时按设计归一化的字符（见 build_pdf.py 的 GLYPH_MAP）不算异常
+    allowed = set("\u21d2\u25cf\u25b6") | set(GLYPH_FIXES)
+    t = pdf_text(PDF)
+    extra = {c for c in t if c not in src and c not in allowed and not c.isspace()}
+    return {"PDF 出现源文没有的字符": len(extra)}
+
+
+GLYPH_FIXES = "\u27f9\U0001f7e2\U0001f680\ufe0f"
+
+
 def run_checker(script: str) -> str:
     p = subprocess.run([sys.executable, str(REPO / "tools" / script)],
                        capture_output=True, text=True)
@@ -305,8 +342,7 @@ def count_pdf() -> dict[str, object]:
     if rep.exists():
         out["PDF 缺字形告警"] = json.loads(rep.read_text(encoding="utf-8")).get("glyph_warnings")
 
-    txt = subprocess.run(["pdftotext", "-layout", str(PDF), "-"],
-                         capture_output=True, text=True).stdout
+    txt = pdf_text(PDF)
     flat = re.sub(r"[.\s]+", "", txt)
     toc = "".join(txt.split("\f")[:8])
     toc_flat = re.sub(r"[.\s]+", "", toc)
@@ -358,6 +394,7 @@ def main() -> None:
     cur.update(count_readme_drift())
     cur.update(count_checkers())
     cur.update(count_pdf())
+    cur.update(count_pdf_chars())
 
     if args.update:
         changed = {k: v for k, v in cur.items() if BASELINE.get(k) != v}

@@ -99,9 +99,19 @@ HEADER_TEX = r"""
 \usepackage{newunicodechar}
 \newfontfamily\dingfont{Zapf Dingbats}
 \newunicodechar{➥}{{\dingfont ➥}}
-% 代码块超过版心的长行自动折行
+% 省略号：宋体一族（Songti SC / Songti TC / STSong / Kaiti SC）的 ToUnicode 会把
+% U+2026（…）反查成 U+22EF（⋯）——**复制出来与源文不是同一个码位**。代码块用的
+% Menlo 映射正确，只有中文正文受影响。这里把省略号换到一个映射正确的 CJK 字体。
+% 注意必须用 newCJKfontfamily（保持该字符仍在 CJK 标点类里）——
+% 直接用 newfontfamily + newunicodechar 会被 xeCJK 的标点处理绕过去，不生效。
+\newCJKfontfamily\ellipsisfont{PingFang SC}
+\newunicodechar{…}{{\ellipsisfont …}}
+% 代码块超过版心的长行自动折行。
+% breaksymbolleft/right 必须清空：fvextra 默认在折行处插一个 ↪，它会**打印在页面上
+% 并被复制进读者的代码里**（实测 29 处），是拷贝乱码的来源之一。
+% 改用 breakindent 缩进续行来提示折行，复制出来只是多几个空格。
 \usepackage{fvextra}
-\fvset{breaklines=true,breakanywhere=true,fontsize=\small}
+\fvset{breaklines=true,breakanywhere=true,breaksymbolleft={},breaksymbolright={},breakindent=1.5em,fontsize=\small}
 """
 
 
