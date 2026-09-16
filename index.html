@@ -90,8 +90,20 @@
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/zoom-image.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify/lib/plugins/copy-code.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/docsify-pagination/dist/docsify-pagination.min.js"></script>
+  <!-- prism 语言组件。docsify 自带的 prism 只有 markup/css/clike/javascript，
+       这里补齐书稿实际用到的语言，否则对应代码块放着色（不报错）。
+       ⚠️ 依赖必须写在 docsify 之后 —— prism 组件文件末尾是 `}(Prism)`，
+       要靠 docsify 暴露的全局 Prism 实例才能注册上。
+       命名对应关系（与 cn-book 里的围栏标记一致）：
+         powershell 组件 → languages.powershell
+         docker   组件 → languages.docker，并设 dockerfile 别名
+         yaml     组件 → languages.yaml
+       text 不需要组件：prism-core 已自带 plaintext/text/txt 别名。 -->
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-python.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-bash.min.js"></script>
   <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-json.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-powershell.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-docker.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/prismjs@1/components/prism-yaml.min.js"></script>
 </body>
 </html>
