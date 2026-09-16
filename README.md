@@ -46,27 +46,27 @@
 - [关于本书](cn-book/0.关于本书.md)
 
 ### 第一部分：基础与核心组件 | Part One: Foundations & Core Components
-- [第 1 章：AI Agent 的崛起](cn-book/1.AI智能体的崛起.md)
-- [第 2 章：核心组件：大语言模型、提示词与 Agent](cn-book/2.核心组件.md)
+- [第 1 章 AI Agent 的崛起](cn-book/1.AI智能体的崛起.md)
+- [第 2 章 核心组件：大语言模型、Prompt 与 Agent](cn-book/2.核心组件.md)
 
 ### 第二部分：协议与多智能体 | Part Two: MCP & Multi-Agent Systems
-- [第 3 章：AI Agent 的 MCP 操作](cn-book/3.AI智能体的MCP操作.md)
-- [第 4 章：架构与构建多智能体系统](cn-book/4.架构与构建多智能体系统.md)
+- [第 3 章 使用 MCP 为 AI Agent 添加行动能力](cn-book/3.AI智能体的MCP操作.md)
+- [第 4 章 构建多智能体（Multi-Agent）系统架构](cn-book/4.架构与构建多智能体系统.md)
 
 ### 第三部分：Agent 核心能力 | Part Three: Core Agent Capabilities
-- [第 5 章：Agent 推理与规划](cn-book/5.智能体推理与规划.md)
-- [第 6 章：为 Agent 处理记忆与知识 RAG](cn-book/6.为智能体处理记忆与知识RAG.md)
-- [第 7 章：通过评估与反馈构建稳健的 Agent](cn-book/7.通过评估与反馈构建稳健的智能体.md)
+- [第 5 章 Agent 推理与规划](cn-book/5.智能体推理与规划.md)
+- [第 6 章 为 Agent 构建记忆与知识：RAG 实践](cn-book/6.为智能体处理记忆与知识RAG.md)
+- [第 7 章 构建健壮的 Agent：评估与反馈](cn-book/7.通过评估与反馈构建稳健的智能体.md)
 
 ### 第四部分：部署与高级主题 | Part Four: Deployment & Advanced Topics
-- [第 8 章：部署 Agent 与 Agent 系统](cn-book/8.部署智能体与智能体系统.md)
-- [第 9 章：理解 Agent 循环](cn-book/9.理解智能体循环.md)
-- [第 10 章：探索会思考、监控和适应的认知 Agent](cn-book/10.探索会思考、监控和适应的认知智能体.md)
-- [第 11 章：构建 Agent 系统的实用技巧](cn-book/11.构建智能体系统的实用技巧.md)
+- [第 8 章 部署 Agent 和 Agent 系统](cn-book/8.部署智能体与智能体系统.md)
+- [第 9 章 理解 Agentic Loop（Agent 循环）](cn-book/9.理解智能体循环.md)
+- [第 10 章 探索能够思考、监控和自适应的认知 Agent](cn-book/10.探索会思考、监控和适应的认知智能体.md)
+- [第 11 章 构建 Agent 系统的技巧（Tips for building agentic systems）](cn-book/11.构建智能体系统的实用技巧.md)
 
 ### 附录 | Appendices
-- [附录 A：设置示例代码仓库](cn-book/附录A-设置示例代码仓库.md)
-- [附录 B：为本地 MCP 服务器设置 Node.js](cn-book/附录B-为本地MCP服务器设置Node.js.md)
+- [附录 A 设置示例代码仓库](cn-book/附录A-设置示例代码仓库.md)
+- [附录 B 为本地 MCP 服务器设置 Node.js](cn-book/附录B-为本地MCP服务器设置Node.js.md)
 
 ---
 
@@ -74,13 +74,13 @@
 
 ### 🎯 第一部分：基础与核心组件
 
-**第 1 章：AI Agent 的崛起**
+**第 1 章 AI Agent 的崛起**
 - Agent 与 Agent 思维的定义
 - Model Context Protocol（MCP，模型上下文协议）简介
 - 构成 Agent 的五个功能层
 - 从助手到 Agent 系统的演进
 
-**第 2 章：核心组件：大语言模型、提示词与 Agent**
+**第 2 章 核心组件：大语言模型、Prompt 与 Agent**
 - 大语言模型作为概率性令牌机器
 - 通过提示工程控制 LLM 输出
 - 使用 OpenAI Agents SDK 构建 Agent
@@ -88,13 +88,13 @@
 
 ### 🔌 第二部分：协议与多智能体
 
-**第 3 章：AI Agent 的 MCP 操作**
+**第 3 章 使用 MCP 为 AI Agent 添加行动能力**
 - MCP 架构：客户端、服务器与服务
 - 开始使用与操作 MCP 服务器
 - 构建自定义 MCP 服务器
 - 使 Agent 与外部系统无缝交互
 
-**第 4 章：架构与构建多智能体系统**
+**第 4 章 构建多智能体（Multi-Agent）系统架构**
 - 流、编排与协作的基本架构
 - 平衡 Agent 与 Agent 流
 - 管理 Agent 之间的交接
@@ -102,19 +102,19 @@
 
 ### ⚡ 第三部分：Agent 核心能力
 
-**第 5 章：Agent 推理与规划**
+**第 5 章 Agent 推理与规划**
 - 思维链（CoT）与 ReAct 范式
 - 指导 Agent 进行推理与规划
 - 高级规划策略
 - 利用顺序思考 MCP 服务器提升自主解决问题能力
 
-**第 6 章：为 Agent 处理记忆与知识 RAG**
+**第 6 章 为 Agent 构建记忆与知识：RAG 实践**
 - 向量数据库与相似性搜索摄取文档
 - 检索机制作为知识来源
 - 检索机制作为记忆来源
 - 通过 MCP 回忆之前的交互
 
-**第 7 章：通过评估与反馈构建稳健的 Agent**
+**第 7 章 构建健壮的 Agent：评估与反馈**
 - 测试驱动的 Agent 开发（TDAD）
 - 基础化 Agent 与批评者 Agent
 - 使用 Phoenix 进行全面评估与反馈
@@ -122,25 +122,25 @@
 
 ### 🚀 第四部分：部署与高级主题
 
-**第 8 章：部署 Agent 与 Agent 系统**
+**第 8 章 部署 Agent 和 Agent 系统**
 - 将 Agent 嵌入应用程序
 - 作为微服务暴露 Agent
 - 使用 Docker 将 Agent 系统部署到生产环境
 - 安全、保障与治理的关键考量
 
-**第 9 章：理解 Agent 循环**
+**第 9 章 理解 Agentic Loop（Agent 循环）**
 - 内部 SPAL 循环、外部任务循环与元循环
 - 构建深度研究 Agent
 - 实现多智能体编排循环
 - 构建协作 Agent 循环
 
-**第 10 章：探索会思考、监控和适应的认知 Agent**
+**第 10 章 探索能够思考、监控和自适应的认知 Agent**
 - 认知与元认知作为 Agent 工程概念
 - 认知科学理论映射到认知 Agent 架构
 - 实现元认知过程
 - 使 Agent 思考自身思维、监控表现并调整策略
 
-**第 11 章：构建 Agent 系统的实用技巧**
+**第 11 章 构建 Agent 系统的技巧（Tips for building agentic systems）**
 - 按五个 Agent 层组织的实战经验
 - 客户支持 Agent 角色指南
 - RAG Agent 系统设计模式
