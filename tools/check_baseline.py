@@ -67,6 +67,10 @@ BASELINE: dict[str, object] = {
     "④ 全角标点后接中文": 0,
     "⑤ 全角标点后接半角": 0,
     "⑥ 加粗标记错位": 0,
+    # 引号合规（GB/T 15834，全部应为 0）
+    "正文非标准引号「」": 0,
+    "正文直双引号": 0,
+    "正文弯引号左右差": 0,
     # 校验器
     "结构检查·严重": 0,
     "结构检查·中等": 0,
@@ -326,6 +330,42 @@ def count_pdf_overflow() -> dict[str, int]:
     return {"PDF 越界裁切行": n}
 
 
+def count_quotes() -> dict[str, int]:
+    """引号合规（GB/T 15834《标点符号用法》：简体中文双引号 U+201C/U+201D、
+    单引号 U+2018/U+2019）。三个独立指标，各抓一类失败：
+
+    - **直角引号「」『』**：繁中/日文样式，本书不用。曾出现 5 个「 只对 4 个」，
+      即 ch2:304 漏了闭引号（「感知 → 规划 → 行动 → 学习 循环）。
+    - **正文直双引号 "**：源文写直引号时，pandoc 的 `smart` 会按左右侧字符猜开闭，
+      而中文语境相邻字符是汉字、启发式失效 —— 实测 82 个直引号被转成 15 个 “ + 67 个 ”，
+      页面上出现「”简洁回答”」这种开引号变闭引号的错形；网站侧（marked 不做 smart）
+      则原样显示直引号。**在源文件里写正确码位即可两边根治。**
+    - **弯引号左右不配对**：全书写“ ”时，两者数量必须相等。
+    """
+    nonstd = straight = lq = rq = 0
+    for f in SRC.glob("*.md"):
+        in_fence = False
+        for line in f.read_text(encoding="utf-8").splitlines():
+            if FENCE.match(line):
+                in_fence = not in_fence
+                continue
+            if in_fence:
+                continue
+            # 行内代码/链接/HTML 标签里的引号是代码内容，不算正文
+            prose = re.sub(r"`[^`]*`", "", line)
+            prose = re.sub(r"!?\[[^\]]*\]\([^)]*\)", "", prose)
+            prose = re.sub(r"<[^>]*>", "", prose)
+            nonstd += sum(prose.count(c) for c in "\u300c\u300d\u300e\u300f")
+            straight += prose.count('"')
+            lq += prose.count("\u201c")
+            rq += prose.count("\u201d")
+    return {
+        "正文非标准引号「」": nonstd,
+        "正文直双引号": straight,
+        "正文弯引号左右差": abs(lq - rq),
+    }
+
+
 def run_checker(script: str) -> str:
     p = subprocess.run([sys.executable, str(REPO / "tools" / script)],
                        capture_output=True, text=True)
@@ -427,6 +467,7 @@ def main() -> None:
     cur.update(count_headings())
     cur.update(count_terms())
     cur.update(count_typography())
+    cur.update(count_quotes())
     cur.update(count_links())
     cur.update(count_code_cjk())
     cur.update(count_readme_drift())
