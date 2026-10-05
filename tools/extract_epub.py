@@ -130,19 +130,13 @@ class Extractor(HTMLParser):
             self.cell = []
             return
         if tag in ("strong", "b"):
-            self.buf.append("**")
-            if self.cell is not None:
-                self.cell.append("**")
+            (self.cell if self.cell is not None else self.buf).append("**")
             return
         if tag in ("em", "i"):
-            self.buf.append("*")
-            if self.cell is not None:
-                self.cell.append("*")
+            (self.cell if self.cell is not None else self.buf).append("*")
             return
         if tag == "code":
-            self.buf.append("`")
-            if self.cell is not None:
-                self.cell.append("`")
+            (self.cell if self.cell is not None else self.buf).append("`")
             return
         if tag == "br":
             self.buf.append(" ")
@@ -234,9 +228,7 @@ class Extractor(HTMLParser):
             return
 
     def _close_inline(self, marker: str) -> None:
-        if self.cell is not None:
-            self.cell.append(marker)
-        self.buf.append(marker)
+        (self.cell if self.cell is not None else self.buf).append(marker)
 
     def _flush_buf_to_line(self) -> None:
         text = self._flush_buf()
