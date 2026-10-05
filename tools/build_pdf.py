@@ -122,16 +122,16 @@ HEADER_TEX = r"""
 % 并被复制进读者的代码里**（实测 29 处），是拷贝乱码的来源之一。
 % 改用 breakindent 缩进续行来提示折行，复制出来只是多几个空格。
 \usepackage{fvextra}
-\fvset{breaklines=true,breakanywhere=true,breaksymbolleft={},breaksymbolright={},breakindent=1.5em,fontsize=\small}
+\fvset{breaklines=true,breakanywhere=true,breaksymbolleft={},breaksymbolright={},breakindent=1.5em,fontsize=\footnotesize}
 % 上面这条只作用于 fvextra 的 Verbatim —— 也就是**标了语言**的代码块（pandoc 会输出
 % Shaded/Highlighting，里面是 Verbatim）。没标语言的块 pandoc 输出的是标准
-% \begin{verbatim}：既不折行、也不吃 \small，超过版心的长行**直接顶出纸面被裁掉**。
+% \begin{verbatim}：既不折行、也不吃 \footnotesize，超过版心的长行**直接顶出纸面被裁掉**。
 % 实测第 8 章 8 行被切（页 267/283/284/285），页面上会看到 "to confirm reac"
 % （reaction 被切）、"what remains unkn"（unknown 被切）。
 % 注意这个缺陷骗过了所有原有指标：字形都在（缺字形 0）、没多出字符（字符差集 0）、
 % 页数正常，只有量每行的 xMax 才看得见。已固化为基线项「PDF 越界裁切行」。
 % 这里把 verbatim 也换成 Verbatim，两类代码块行为一致。
-\RecustomVerbatimEnvironment{verbatim}{Verbatim}{breaklines=true,breakanywhere=true,breaksymbolleft={},breaksymbolright={},breakindent=1.5em,fontsize=\small}
+\RecustomVerbatimEnvironment{verbatim}{Verbatim}{breaklines=true,breakanywhere=true,breaksymbolleft={},breaksymbolright={},breakindent=1.5em,fontsize=\footnotesize}
 """
 
 
